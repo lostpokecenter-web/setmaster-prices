@@ -1,0 +1,22 @@
+# Card pictures: copies pictures we do not have yet to our own storage (Yu-Gi-Oh! so far). Only new cards are fetched.
+# Secrets: IMPORT_URL, IMPORT_TOKEN (the same ones the prices job uses).
+name: images
+on:
+  schedule:
+    - cron: '41 10 * * 1'   # every Monday, 10:41 UTC (03:41 in Arizona): new sets only need a weekly check
+  workflow_dispatch: {}
+concurrency: { group: images, cancel-in-progress: false }
+jobs:
+  yugioh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    defaults: { run: { working-directory: backend/tools } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Yu-Gi-Oh! pictures
+        env:
+          IMPORT_URL: '${{ secrets.IMPORT_URL }}'
+          IMPORT_TOKEN: '${{ secrets.IMPORT_TOKEN }}'
+        run: python images_yugioh.py

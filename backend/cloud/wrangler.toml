@@ -1,0 +1,29 @@
+name = "setmaster-api"
+main = "index.mjs"
+compatibility_date = "2026-01-01"
+
+# Serve it at api.lostpokecenter.com (the domain must be on your Cloudflare account).
+routes = [{ pattern = "api.lostpokecenter.com", custom_domain = true }]
+
+[vars]
+MODEL = "gemini-3.7-flash"
+# FALLBACK_MODEL = ""   # optional second model tried when the first is overloaded or rate limited
+ALLOWED_ORIGINS = "https://app.lostpokecenter.com"   # browsers allowed to call the API (the web app)
+
+# Optional: a per-caller limit (60 scans a minute per IP address here). Remove if your account does not offer the binding.
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1001"
+  [ratelimits.simple]
+  limit = 60
+  period = 60
+
+# PriceCharting prices (stored by the daily job). Create once: npx wrangler r2 bucket create setmaster-prices
+[[r2_buckets]]
+binding = "PRICES"
+bucket_name = "setmaster-prices"
+
+# Card pictures (stored by the daily picture job). Create once: npx wrangler r2 bucket create setmaster-images
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "setmaster-images"

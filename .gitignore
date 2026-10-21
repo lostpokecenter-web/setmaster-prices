@@ -1,0 +1,6 @@
+.env
+downloads/
+download_log.txt
+__pycache__/
+node_modules/
+.wrangler/

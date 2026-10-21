@@ -1,0 +1,36 @@
+# Daily PriceCharting import: download the price lists, turn them into per-set files, upload them to api.lostpokecenter.com.
+# Secrets (repository settings > Secrets and variables > Actions): PRICECHARTING_TOKEN, IMPORT_TOKEN. IMPORT_URL is not secret but kept there too.
+name: prices
+on:
+  schedule:
+    - cron: '17 9 * * *'   # every day, 09:17 UTC (02:17 in Arizona)
+  workflow_dispatch: {}
+concurrency: { group: prices, cancel-in-progress: false }
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    defaults: { run: { working-directory: backend/tools } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install requests beautifulsoup4
+      - name: Download the per-set lists (Lorcana, Digimon, Dragon Ball, Star Wars, Riftbound, Gundam)
+        env: { PRICECHARTING_TOKEN: '${{ secrets.PRICECHARTING_TOKEN }}' }
+        run: python pricecharting_sets.py
+        continue-on-error: true
+      - name: Download the whole-game lists (Pokemon, Magic, Yu-Gi-Oh!, One Piece)
+        env: { PRICECHARTING_TOKEN: '${{ secrets.PRICECHARTING_TOKEN }}' }
+        run: python pricecharting_sets.py --big
+        continue-on-error: true
+      - name: Upload to the server
+        env:
+          IMPORT_URL: '${{ secrets.IMPORT_URL }}'
+          IMPORT_TOKEN: '${{ secrets.IMPORT_TOKEN }}'
+        run: python pricecharting_upload.py downloads
+      - name: Keep the price history (adds today's prices to each set's history)
+        env:
+          IMPORT_URL: '${{ secrets.IMPORT_URL }}'
+          IMPORT_TOKEN: '${{ secrets.IMPORT_TOKEN }}'
+        run: python pricecharting_history.py downloads
