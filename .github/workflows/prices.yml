@@ -1,5 +1,7 @@
 # Daily PriceCharting import: download the price lists, turn them into per-set files, upload them to api.lostpokecenter.com.
 # Secrets (repository settings > Secrets and variables > Actions): PRICECHARTING_TOKEN, IMPORT_TOKEN. IMPORT_URL is not secret but kept there too.
+# Order matters: the big games (Pokemon, Magic, Yu-Gi-Oh!, One Piece) are downloaded, uploaded and added to the price history FIRST.
+# The slow per-set lists (Lorcana, Digimon, ...) come last, with their own time limits, so a slow or stuck one can never hold up the rest.
 name: prices
 on:
   schedule:
@@ -9,28 +11,45 @@ concurrency: { group: prices, cancel-in-progress: false }
 jobs:
   import:
     runs-on: ubuntu-latest
-    timeout-minutes: 330
+    timeout-minutes: 300
     defaults: { run: { working-directory: backend/tools } }
+    env:
+      PRICECHARTING_TOKEN: '${{ secrets.PRICECHARTING_TOKEN }}'
+      IMPORT_URL: '${{ secrets.IMPORT_URL }}'
+      IMPORT_TOKEN: '${{ secrets.IMPORT_TOKEN }}'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
       - run: pip install requests beautifulsoup4
-      - name: Download the per-set lists (Lorcana, Digimon, Dragon Ball, Star Wars, Riftbound, Gundam)
-        env: { PRICECHARTING_TOKEN: '${{ secrets.PRICECHARTING_TOKEN }}' }
-        run: python pricecharting_sets.py
+
+      - name: 1. Download the whole-game lists (Pokemon, Magic, Yu-Gi-Oh!, One Piece)
+        timeout-minutes: 75
         continue-on-error: true
-      - name: Download the whole-game lists (Pokemon, Magic, Yu-Gi-Oh!, One Piece)
-        env: { PRICECHARTING_TOKEN: '${{ secrets.PRICECHARTING_TOKEN }}' }
         run: python pricecharting_sets.py --big
+      - name: 2. Upload the whole-game lists to the server
+        timeout-minutes: 45
         continue-on-error: true
-      - name: Upload to the server
-        env:
-          IMPORT_URL: '${{ secrets.IMPORT_URL }}'
-          IMPORT_TOKEN: '${{ secrets.IMPORT_TOKEN }}'
-        run: python pricecharting_upload.py downloads
-      - name: Keep the price history (adds today's prices to each set's history)
-        env:
-          IMPORT_URL: '${{ secrets.IMPORT_URL }}'
-          IMPORT_TOKEN: '${{ secrets.IMPORT_TOKEN }}'
-        run: python pricecharting_history.py downloads
+        run: |
+          args=""
+          for d in pokemon mtg yugioh onepiece; do [ -d "downloads/$d" ] && args="$args downloads/$d"; done
+          if [ -n "$args" ]; then python pricecharting_upload.py $args; else echo "No whole-game files were downloaded"; exit 1; fi
+      - name: 3. Keep the price history (whole-game lists)
+        timeout-minutes: 45
+        continue-on-error: true
+        run: |
+          args=""
+          for d in pokemon mtg yugioh onepiece; do [ -d "downloads/$d" ] && args="$args downloads/$d"; done
+          if [ -n "$args" ]; then python pricecharting_history.py $args; fi
+
+      - name: 4. Download the per-set lists (Lorcana, Digimon, Dragon Ball, Star Wars, Riftbound, Gundam)
+        timeout-minutes: 120
+        continue-on-error: true
+        run: python pricecharting_sets.py --budget-minutes 100
+      - name: 5. Upload the per-set lists and keep their history
+        timeout-minutes: 45
+        continue-on-error: true
+        run: |
+          args=""
+          for d in lorcana digimon dragonball swu other; do [ -d "downloads/$d" ] && args="$args downloads/$d"; done
+          if [ -n "$args" ]; then python pricecharting_upload.py $args && python pricecharting_history.py $args; else echo "No per-set files were downloaded"; fi
