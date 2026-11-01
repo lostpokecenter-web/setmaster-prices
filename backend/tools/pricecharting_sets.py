@@ -162,16 +162,20 @@ def fetch_big(s, today):
         if dest.exists():
             log(f'skip {cat}: already downloaded today')
             continue
+        # If you have a direct link for this game (PC_URL_POKEMON, PC_URL_MTG, PC_URL_YUGIOH, PC_URL_ONEPIECE, kept as GitHub secrets because
+        # the link holds your token), it is used instead of the built-in address.
+        custom = os.environ.get(f'PC_URL_{game.upper()}', '').strip()
+        url = custom or f'{BASE}/price-guide/download-custom?t={tok}&category={cat}'
         if done:
-            time.sleep(11 * 60)
+            time.sleep(float(os.environ.get('PC_BIG_GAP_MINUTES', '11')) * 60)
         r = None
         for attempt in range(3):
             try:
                 # The whole-game file is large and PriceCharting can take several minutes to build it: wait up to 15 minutes for the answer.
-                r = s.get(f'{BASE}/price-guide/download-custom?t={tok}&category={cat}', timeout=(30, 900))
+                r = s.get(url, timeout=(30, 900))
             except requests.RequestException as e:
                 r = None
-                msg = str(e)
+                msg = re.sub(r'([?&](?:t|token|key|api_key)=)[^&\s\'")]+', r'\1XXXX', str(e))
                 if tok:
                     msg = msg.replace(tok, 'XXXX')
                 log(f'  {cat}: {type(e).__name__} ({msg[:120]}); waiting 11 minutes, then trying again ({attempt + 1}/3)')
