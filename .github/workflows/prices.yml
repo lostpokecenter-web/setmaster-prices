@@ -16,6 +16,10 @@ jobs:
     env:
       PYTHONUNBUFFERED: '1'   # show the log lines as they happen
       PRICECHARTING_TOKEN: '${{ secrets.PRICECHARTING_TOKEN }}'
+      PC_URL_POKEMON: '${{ secrets.PC_URL_POKEMON }}'   # optional direct links for the whole-game lists (they hold your token, so they are secrets)
+      PC_URL_MTG: '${{ secrets.PC_URL_MTG }}'
+      PC_URL_YUGIOH: '${{ secrets.PC_URL_YUGIOH }}'
+      PC_URL_ONEPIECE: '${{ secrets.PC_URL_ONEPIECE }}'
       IMPORT_URL: '${{ secrets.IMPORT_URL }}'
       IMPORT_TOKEN: '${{ secrets.IMPORT_TOKEN }}'
     steps:
