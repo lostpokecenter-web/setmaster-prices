@@ -11,9 +11,10 @@ concurrency: { group: prices, cancel-in-progress: false }
 jobs:
   import:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 330
     defaults: { run: { working-directory: backend/tools } }
     env:
+      PYTHONUNBUFFERED: '1'   # show the log lines as they happen
       PRICECHARTING_TOKEN: '${{ secrets.PRICECHARTING_TOKEN }}'
       IMPORT_URL: '${{ secrets.IMPORT_URL }}'
       IMPORT_TOKEN: '${{ secrets.IMPORT_TOKEN }}'
@@ -24,7 +25,7 @@ jobs:
       - run: pip install requests beautifulsoup4
 
       - name: 1. Download the whole-game lists (Pokemon, Magic, Yu-Gi-Oh!, One Piece)
-        timeout-minutes: 75
+        timeout-minutes: 110
         continue-on-error: true
         run: python pricecharting_sets.py --big
       - name: 2. Upload the whole-game lists to the server
@@ -43,9 +44,9 @@ jobs:
           if [ -n "$args" ]; then python pricecharting_history.py $args; fi
 
       - name: 4. Download the per-set lists (Lorcana, Digimon, Dragon Ball, Star Wars, Riftbound, Gundam)
-        timeout-minutes: 120
+        timeout-minutes: 100
         continue-on-error: true
-        run: python pricecharting_sets.py --budget-minutes 100
+        run: python pricecharting_sets.py --budget-minutes 80
       - name: 5. Upload the per-set lists and keep their history
         timeout-minutes: 45
         continue-on-error: true
