@@ -164,14 +164,28 @@ def fetch_big(s, today):
             continue
         if done:
             time.sleep(11 * 60)
+        r = None
         for attempt in range(3):
-            r = s.get(f'{BASE}/price-guide/download-custom?t={tok}&category={cat}', timeout=300)
+            try:
+                # The whole-game file is large and PriceCharting can take several minutes to build it: wait up to 15 minutes for the answer.
+                r = s.get(f'{BASE}/price-guide/download-custom?t={tok}&category={cat}', timeout=(30, 900))
+            except requests.RequestException as e:
+                r = None
+                msg = str(e)
+                if tok:
+                    msg = msg.replace(tok, 'XXXX')
+                log(f'  {cat}: {type(e).__name__} ({msg[:120]}); waiting 11 minutes, then trying again ({attempt + 1}/3)')
+                time.sleep(11 * 60)
+                continue
             if r.status_code == 429:
                 log(f'  429 on {cat}: waiting 11 minutes')
                 time.sleep(11 * 60)
                 continue
             break
         done += 1
+        if r is None:
+            log(f'FAIL big/{cat}: no answer from PriceCharting after 3 tries; it is tried again tomorrow')
+            continue
         if r.status_code != 200 or not r.text.lstrip('\ufeff').startswith(CSV_HEAD):
             log(f'FAIL big/{cat}: HTTP {r.status_code}, not a CSV (the whole-game address may differ; send the real link with the token as XXXX)')
             continue
@@ -203,7 +217,11 @@ def main():
         fetch_big(s, today)
         return 0
     bad_auth = 0
-    for cat in args.categories:
+    cats = list(args.categories)
+    if args.budget_minutes and len(cats) > 1:  # start from a different category each day, so a time budget still reaches every one of them over a few days
+        k = datetime.date.today().toordinal() % len(cats)
+        cats = cats[k:] + cats[:k]
+    for cat in cats:
         try:
             sets = discover_sets(s, cat)
         except Exception as e:
